@@ -17,7 +17,6 @@ final class ConfigProvider
 	{
 		return [
 			'dependencies' => [
-				ComposerInterface::class       => ComposerFactory::class,
 				ConfigProviderInterface::class => ConfigProviderFactory::class,
 				ConfigInterface::class         => ConfigFactory::class,
 			],
