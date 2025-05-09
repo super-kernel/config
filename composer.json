@@ -16,7 +16,7 @@
     "minimum-stability": "dev",
     "require": {
         "php": ">=8.4",
-        "super-kernel/contract": "dev-main"
+        "super-kernel/contract": "^1.0"
     },
     "extra": {
         "SuperKernel": {
