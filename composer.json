@@ -1,0 +1,26 @@
+{
+    "name": "super-kernel/config",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "SuperKernel\\Config\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "wheakerd",
+            "email": "wheakerd@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=8.4",
+        "super-kernel/contract": "dev-main"
+    },
+    "extra": {
+        "SuperKernel": {
+            "config": "SuperKernel\\Config\\ConfigProvider"
+        }
+    }
+}
