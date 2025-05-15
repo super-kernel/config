@@ -20,7 +20,7 @@
     },
     "extra": {
         "SuperKernel": {
-            "config": "SuperKernel\\Config\\ConfigProvider"
+            "config": "ProviderConfig"
         }
     }
 }

@@ -9,23 +9,26 @@ use SuperKernel\Contract\ConfigInterface;
  * @Config
  * @\SuperKernel\Config\Config
  */
-final readonly class Config implements ConfigInterface
+final class Config implements ConfigInterface
 {
-	public function __construct(private array $configs)
-	{
-	}
+	private static array $configs = [];
 
 	public function get(?string $key = null, mixed $default = null): mixed
 	{
 		if (null === $key) {
-			return $this->configs;
+			return self::$configs;
 		}
 
-		return $this->configs[$key] ?? $default;
+		return self::$configs[$key] ?? $default;
 	}
 
 	public function has(string $key): bool
 	{
-		return isset($this->configs[$key]) || array_key_exists($key, $this->configs);
+		return isset(self::$configs[$key]) || array_key_exists($key, self::$configs);
+	}
+
+	public function set(string $key, mixed $value): void
+	{
+		self::$configs[$key] = $value;
 	}
 }
