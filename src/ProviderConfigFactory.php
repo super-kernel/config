@@ -79,8 +79,8 @@ final class ProviderConfigFactory
 					) {
 						throw new RuntimeException(
 							sprintf(
-								'The configProvider for package [%s] is invalid, `extra.config` must be an 
-								existing classname string that inherits from `ConfigProviderInterface`.',
+								'The configProvider for package [%s] is invalid, `extra.config` must be an ' .
+								'existing classname string that inherits from `ConfigProviderInterface`.',
 								$packageName,
 							),
 						);
