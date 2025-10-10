@@ -1,0 +1,30 @@
+{
+    "name": "super-kernel/config",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "SuperKernel\\Config\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "wheakerd",
+            "email": "wheakerd@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": ">=8.4",
+        "super-kernel/contract": "^1.0",
+        "super-kernel/attribute": "^1.0"
+    },
+    "extra": {
+        "SuperKernel": {
+            "config": "SuperKernel\\Config\\ConfigProvider"
+        }
+    },
+    "require-dev": {
+        "swoole/ide-helper": "dev-master"
+    }
+}
