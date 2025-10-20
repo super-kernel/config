@@ -2,7 +2,7 @@
     "name": "super-kernel/config",
     "type": "library",
     "license": "MIT",
-    "description": "All configuration interfaces of the super-kernel.",
+    "description": "The config component for super-kernel.",
     "keywords": [
         "php",
         "swoole",
@@ -23,10 +23,7 @@
     "minimum-stability": "stable",
     "require": {
         "php": ">=8.4",
-        "super-kernel/contract": "^1.0",
-        "super-kernel/attribute": "^1.0"
-    },
-    "require-dev": {
-        "swoole/ide-helper": "dev-master"
+        "super-kernel/contract": "*",
+        "super-kernel/attribute": "*"
     }
 }

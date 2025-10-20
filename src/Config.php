@@ -6,16 +6,14 @@ namespace SuperKernel\Config;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
-use Psr\Log\LoggerInterface;
-use ReflectionClass;
-use SuperKernel\Attribute\Contract;
+use SuperKernel\Attribute\Configuration;
 use SuperKernel\Attribute\Factory;
-use SuperKernel\Config\Attribute\Configuration;
+use SuperKernel\Attribute\Provider;
+use SuperKernel\Contract\AttributeCollectorInterface;
 use SuperKernel\Contract\ConfigInterface;
-use SuperKernel\Contract\ReflectionManagerInterface;
 
 #[
-	Contract(ConfigInterface::class),
+	Provider(ConfigInterface::class),
 	Factory,
 ]
 final class Config implements ConfigInterface
@@ -33,35 +31,22 @@ final class Config implements ConfigInterface
 	}
 
 	/**
-	 * @param ContainerInterface $container
+	 * @param ContainerInterface          $container
+	 * @param AttributeCollectorInterface $attributeCollector
 	 *
 	 * @return ConfigInterface
 	 * @throws ContainerExceptionInterface
 	 * @throws NotFoundExceptionInterface
 	 */
-	public function __invoke(ContainerInterface $container): ConfigInterface
+	public function __invoke(
+		ContainerInterface          $container,
+		AttributeCollectorInterface $attributeCollector,
+	): ConfigInterface
 	{
-		$logger            = $container->get(LoggerInterface::class);
-		$reflectionManager = $container->get(ReflectionManagerInterface::class);
-		$classes           = $reflectionManager->getAttributes(Configuration::class);
-
-		foreach ($classes as $class) {
-			$interfaces = $reflectionManager->reflectClass($class)->getInterfaces();
-			/* @var ReflectionClass $interface */
-			foreach ($interfaces as $interface) {
-				$InterfaceName = $interface->getName();
-				if ($this->has($InterfaceName)) {
-					$logger->warning(
-						sprintf(
-							'Interface %s is implemented repeatedly, and class %s will replace class %s to provide configuration.',
-							$interface,
-							$class,
-							$InterfaceName,
-						),
-					);
-				}
-
-				$this->configs[$InterfaceName] = $container->get($class);
+		foreach ($attributeCollector->getAttributes(Configuration::class) as $class => $attributes) {
+			/* @var Configuration $attribute */
+			foreach ($attributes as $attribute) {
+				$this->configs[$attribute->interface] = $container->get($class);
 			}
 		}
 
