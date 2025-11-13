@@ -6,11 +6,14 @@ namespace SuperKernel\Config;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
-use SuperKernel\Attribute\Configuration;
 use SuperKernel\Attribute\Factory;
 use SuperKernel\Attribute\Provider;
-use SuperKernel\Contract\AttributeCollectorInterface;
+use SuperKernel\Config\Attribute\Configuration;
+use SuperKernel\Config\Exception\InvalidConfigurationException;
 use SuperKernel\Contract\ConfigInterface;
+use SuperKernel\Di\Contract\AttributeCollectorInterface;
+use SuperKernel\Di\Contract\ReflectionCollectorInterface;
+use function count;
 
 #[
 	Provider(ConfigInterface::class),
@@ -31,23 +34,30 @@ final class Config implements ConfigInterface
 	}
 
 	/**
-	 * @param ContainerInterface          $container
-	 * @param AttributeCollectorInterface $attributeCollector
+	 * @param ContainerInterface           $container
+	 * @param AttributeCollectorInterface  $attributeCollector
+	 * @param ReflectionCollectorInterface $reflectionCollector
 	 *
 	 * @return ConfigInterface
 	 * @throws ContainerExceptionInterface
+	 * @throws InvalidConfigurationException
 	 * @throws NotFoundExceptionInterface
 	 */
 	public function __invoke(
-		ContainerInterface          $container,
-		AttributeCollectorInterface $attributeCollector,
+		ContainerInterface           $container,
+		AttributeCollectorInterface  $attributeCollector,
+		ReflectionCollectorInterface $reflectionCollector,
 	): ConfigInterface
 	{
-		foreach ($attributeCollector->getAttributes(Configuration::class) as $class => $attributes) {
-			/* @var Configuration $attribute */
-			foreach ($attributes as $attribute) {
-				$this->configs[$attribute->interface] = $container->get($class);
+		foreach ($attributeCollector->getAttributes(Configuration::class) as $attribute) {
+			$class      = $attribute->class;
+			$interfaces = $reflectionCollector->reflectClass($class)->getInterfaceNames();
+
+			if (count($interfaces) > 1) {
+				throw InvalidConfigurationException::create($class);
 			}
+
+			$this->configs[$interfaces[0]] = $container->get($class);
 		}
 
 		return $this;

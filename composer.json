@@ -14,16 +14,16 @@
             "SuperKernel\\Config\\": "src/"
         }
     },
-    "authors": [
-        {
-            "name": "wheakerd",
-            "email": "wheakerd@gmail.com"
-        }
-    ],
     "minimum-stability": "stable",
     "require": {
         "php": ">=8.4",
-        "super-kernel/contract": "*",
-        "super-kernel/attribute": "*"
+        "super-kernel/contract": "*"
+    },
+    "require-dev": {
+        "super-kernel/di": "*"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "classmap-authoritative": true
     }
 }
