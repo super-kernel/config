@@ -3,12 +3,10 @@ declare(strict_types=1);
 
 namespace SuperKernel\Config\Exception;
 
-use Psr\Container\ContainerExceptionInterface;
-use SuperKernel\Di\Contract\DefinitionInterface;
-use SuperKernel\Di\Exception\Exception;
-use Throwable;
+use RuntimeException;
+use function sprintf;
 
-class InvalidConfigurationException extends Exception implements ContainerExceptionInterface
+class InvalidConfigurationException extends RuntimeException
 {
 	public static function create(string $class): self
 	{

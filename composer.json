@@ -14,16 +14,24 @@
             "SuperKernel\\Config\\": "src/"
         }
     },
-    "minimum-stability": "stable",
-    "require": {
-        "php": ">=8.4",
-        "super-kernel/contract": "*"
-    },
-    "require-dev": {
-        "super-kernel/di": "*"
+    "autoload-dev": {
+        "psr-4": {
+            "SuperKernelTest\\Config\\": "tests/src/"
+        }
     },
     "config": {
+        "sort-packages": true,
         "optimize-autoloader": true,
         "classmap-authoritative": true
+    },
+    "minimum-stability": "stable",
+    "require": {
+        "php": "~8.4.0",
+        "super-kernel/annotation": "^1.0",
+        "super-kernel/attribute": "^1.0",
+        "super-kernel/contract": "~1.0.0"
+    },
+    "require-dev": {
+        "super-kernel/di": "~1.0.0"
     }
 }

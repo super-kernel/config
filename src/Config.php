@@ -6,13 +6,13 @@ namespace SuperKernel\Config;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
+use SuperKernel\Annotation\Factory;
+use SuperKernel\Annotation\Provider;
 use SuperKernel\Config\Attribute\Configuration;
+use SuperKernel\Config\Contract\ConfigInterface;
 use SuperKernel\Config\Exception\InvalidConfigurationException;
-use SuperKernel\Contract\ConfigInterface;
-use SuperKernel\Di\Attribute\Factory;
-use SuperKernel\Di\Attribute\Provider;
-use SuperKernel\Di\Contract\AttributeCollectorInterface;
-use SuperKernel\Di\Contract\ReflectionCollectorInterface;
+use SuperKernel\Contract\AttributeCollectorInterface;
+use SuperKernel\Contract\ReflectorInterface;
 use function count;
 
 #[
@@ -34,9 +34,9 @@ final class Config implements ConfigInterface
 	}
 
 	/**
-	 * @param ContainerInterface           $container
-	 * @param AttributeCollectorInterface  $attributeCollector
-	 * @param ReflectionCollectorInterface $reflectionCollector
+	 * @param ContainerInterface          $container
+	 * @param AttributeCollectorInterface $attributeCollector
+	 * @param ReflectorInterface          $reflector
 	 *
 	 * @return ConfigInterface
 	 * @throws ContainerExceptionInterface
@@ -44,14 +44,14 @@ final class Config implements ConfigInterface
 	 * @throws NotFoundExceptionInterface
 	 */
 	public function __invoke(
-		ContainerInterface           $container,
-		AttributeCollectorInterface  $attributeCollector,
-		ReflectionCollectorInterface $reflectionCollector,
+		ContainerInterface          $container,
+		AttributeCollectorInterface $attributeCollector,
+		ReflectorInterface          $reflector,
 	): ConfigInterface
 	{
-		foreach ($attributeCollector->getAttributes(Configuration::class) as $attribute) {
-			$class      = $attribute->class;
-			$interfaces = $reflectionCollector->reflectClass($class)->getInterfaceNames();
+		foreach ($attributeCollector->getClassesByAttribute(Configuration::class) as $attribute) {
+			$class = $attribute->getClass();
+			$interfaces = $reflector->reflectClass($class)->getInterfaceNames();
 
 			if (count($interfaces) > 1) {
 				throw InvalidConfigurationException::create($class);
