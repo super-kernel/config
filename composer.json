@@ -1,0 +1,34 @@
+{
+    "name": "super-kernel/config",
+    "type": "library",
+    "license": "MIT",
+    "description": "The config component for super-kernel.",
+    "keywords": [
+        "php",
+        "swoole",
+        "super-kernel",
+        "config"
+    ],
+    "homepage": "https://github.com/super-kernel/config",
+    "support": {
+        "issues": "https://github.com/super-kernel/config/issues",
+        "source": "https://github.com/super-kernel/config"
+    },
+    "autoload": {
+        "psr-4": {
+            "SuperKernel\\Config\\": "src/"
+        }
+    },
+    "config": {
+        "classmap-authoritative": true,
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require": {
+        "php": "~8.4.0",
+        "super-kernel/attribute": "~1.0.0",
+        "super-kernel/contract": "~1.0.0"
+    }
+}
