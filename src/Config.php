@@ -12,6 +12,7 @@ use SuperKernel\Config\Exception\ConfigExceptionInterface;
 use SuperKernel\Config\Exception\ConfigurationLoadingException;
 use SuperKernel\Config\Exception\ConfigurationNotFoundException;
 use SuperKernel\Config\Exception\InvalidConfigurationException;
+use SuperKernel\Config\Loading\ConfigExceptionCause;
 use SuperKernel\Contract\ConfigInterface;
 use SuperKernel\Contract\ReflectorInterface;
 use Throwable;
@@ -124,7 +125,30 @@ final class Config implements ConfigInterface
 
         $this->resolving[$key] = true;
         try {
-            $source = $this->source($interface, $definition->source);
+            $source = $this->sources[$interface] ?? null;
+            if (null === $source) {
+                $this->loadingSources[$interface] = true;
+                try {
+                    $source = $this->container->get($definition->source);
+                } catch (Throwable $sourceFailure) {
+                    unset($this->loadingSources[$interface]);
+
+                    throw $sourceFailure;
+                }
+
+                unset($this->loadingSources[$interface]);
+                if (!$source instanceof $definition->source) {
+                    throw new ConfigurationLoadingException(sprintf(
+                        'Configuration source %s for %s resolved to %s.',
+                        $definition->source,
+                        $interface,
+                        get_debug_type($source),
+                    ));
+                }
+
+                $this->sources[$interface] = $source;
+            }
+
             $configuration = null === $method ? $source : $source->{$method}();
             if (!$configuration instanceof $interface) {
                 throw new ConfigurationLoadingException(sprintf(
@@ -139,7 +163,7 @@ final class Config implements ConfigInterface
         } catch (ConfigExceptionInterface $exception) {
             throw $exception;
         } catch (Throwable $throwable) {
-            $configException = self::findPreviousConfigException($throwable);
+            $configException = ConfigExceptionCause::find($throwable);
             if (null !== $configException) {
                 throw $configException;
             }
@@ -152,50 +176,5 @@ final class Config implements ConfigInterface
         } finally {
             unset($this->resolving[$key]);
         }
-    }
-
-    /**
-     * @param class-string $interface
-     * @param class-string $source
-     *
-     * @throws Throwable When source resolution or type validation fails
-     */
-    private function source(string $interface, string $source): object
-    {
-        if (isset($this->sources[$interface])) {
-            return $this->sources[$interface];
-        }
-
-        $this->loadingSources[$interface] = true;
-        try {
-            $configuration = $this->container->get($source);
-            if (!$configuration instanceof $source) {
-                throw new ConfigurationLoadingException(sprintf(
-                    'Configuration source %s for %s resolved to %s.',
-                    $source,
-                    $interface,
-                    get_debug_type($configuration),
-                ));
-            }
-
-            return $this->sources[$interface] = $configuration;
-        } finally {
-            unset($this->loadingSources[$interface]);
-        }
-    }
-
-    private static function findPreviousConfigException(Throwable $throwable): ?ConfigExceptionInterface
-    {
-        $cause = $throwable->getPrevious();
-
-        while (null !== $cause) {
-            if ($cause instanceof ConfigExceptionInterface) {
-                return $cause;
-            }
-
-            $cause = $cause->getPrevious();
-        }
-
-        return null;
     }
 }
