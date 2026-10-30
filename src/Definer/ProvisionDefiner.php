@@ -6,7 +6,6 @@ namespace SuperKernel\Config\Definer;
 
 use ReflectionClass;
 use ReflectionException;
-use ReflectionMethod;
 use ReflectionNamedType;
 use SuperKernel\Attribute\Definer;
 use SuperKernel\Attribute\Provision;
@@ -33,11 +32,57 @@ final readonly class ProvisionDefiner implements DefinerInterface
         foreach ($collector->getMethodsWithAttribute(Provision::class) as $class => $methods) {
             foreach ($methods as $name => [$metadata]) {
                 // Definers bootstrap before container service resolution is available.
-                $method = $this->method($class, $name);
+                try {
+                    $reflection = new ReflectionClass($class);
+                    $method = $reflection->getMethod($name);
+                } catch (ReflectionException $exception) {
+                    throw new InvalidConfigurationException(sprintf(
+                        'Unable to reflect provision method %s::%s.',
+                        $class,
+                        $name,
+                    ), 0, $exception);
+                }
+
+                if (
+                    !$reflection->isInstantiable()
+                    || !$method->isPublic()
+                    || $method->isStatic()
+                    || $method->isConstructor()
+                    || $method->isDestructor()
+                ) {
+                    throw new InvalidConfigurationException(sprintf(
+                        'Provision method %s::%s must be public and non-static on an instantiable class, '
+                        . 'and cannot be a constructor or destructor.',
+                        $class,
+                        $name,
+                    ));
+                }
+
                 $identifiers = $metadata->attribute()->name;
                 if ([] === $identifiers) {
+                    $type = $method->getReturnType();
+                    $declaringClass = $method->getDeclaringClass();
+                    $identifier = null;
+                    if ($type instanceof ReflectionNamedType && !$type->isBuiltin() && !$type->allowsNull()) {
+                        $parent = $declaringClass->getParentClass();
+                        $identifier = match ($type->getName()) {
+                            'self', 'static' => $declaringClass->getName(),
+                            'parent'         => false === $parent ? null : $parent->getName(),
+                            default          => $type->getName(),
+                        };
+                    }
+
+                    if (null === $identifier || (!class_exists($identifier) && !interface_exists($identifier))) {
+                        throw new InvalidConfigurationException(sprintf(
+                            'Unnamed provision %s::%s must declare a non-nullable class or interface return type; '
+                            . 'otherwise specify Provision names explicitly.',
+                            $declaringClass->getName(),
+                            $method->getName(),
+                        ));
+                    }
+
                     $identifiers = [
-                        $this->inferredIdentifier($method),
+                        $identifier,
                     ];
                 }
 
@@ -83,72 +128,5 @@ final readonly class ProvisionDefiner implements DefinerInterface
     public function get(string $id): ProvisionDefinition
     {
         return $this->definitions[$id] ?? throw NotFoundException::forIdentifier($id);
-    }
-
-    /**
-     * @param class-string     $class
-     * @param non-empty-string $name
-     *
-     * @throws InvalidConfigurationException When the source or method cannot act as a factory
-     */
-    private function method(string $class, string $name): ReflectionMethod
-    {
-        try {
-            $reflection = new ReflectionClass($class);
-            $method = $reflection->getMethod($name);
-        } catch (ReflectionException $exception) {
-            throw new InvalidConfigurationException(sprintf(
-                'Unable to reflect provision method %s::%s.',
-                $class,
-                $name,
-            ), 0, $exception);
-        }
-
-        if (
-            !$reflection->isInstantiable()
-            || !$method->isPublic()
-            || $method->isStatic()
-            || $method->isConstructor()
-            || $method->isDestructor()
-        ) {
-            throw new InvalidConfigurationException(sprintf(
-                'Provision method %s::%s must be public and non-static on an instantiable class, '
-                . 'and cannot be a constructor or destructor.',
-                $class,
-                $name,
-            ));
-        }
-
-        return $method;
-    }
-
-    /**
-     * @return class-string
-     *
-     * @throws InvalidConfigurationException When an unnamed provision has no unambiguous object return contract
-     */
-    private function inferredIdentifier(ReflectionMethod $method): string
-    {
-        $type = $method->getReturnType();
-        $class = $method->getDeclaringClass();
-        if ($type instanceof ReflectionNamedType && !$type->isBuiltin() && !$type->allowsNull()) {
-            $parent = $class->getParentClass();
-            $name = match ($type->getName()) {
-                'self', 'static' => $class->getName(),
-                'parent'         => false === $parent ? null : $parent->getName(),
-                default          => $type->getName(),
-            };
-
-            if (null !== $name && (class_exists($name) || interface_exists($name))) {
-                return $name;
-            }
-        }
-
-        throw new InvalidConfigurationException(sprintf(
-            'Unnamed provision %s::%s must declare a non-nullable class or interface return type; '
-            . 'otherwise specify Provision names explicitly.',
-            $class->getName(),
-            $method->getName(),
-        ));
     }
 }
