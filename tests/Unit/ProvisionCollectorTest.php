@@ -17,10 +17,10 @@ use SuperKernel;
 use SuperKernel\Annotator\AnnotationCollector;
 use SuperKernel\Annotator\Model\AttributeMetadata;
 use SuperKernel\Annotator\Model\PackageAnnotations;
-use SuperKernel\Annotator\Scan\ClassAnnotationScanner;
 use SuperKernel\Attribute\Provision;
 use SuperKernel\Config\Collector\ProvisionCollector;
 use SuperKernel\Config\Tests\Fixture\ProvisionMethods;
+use SuperKernel\Config\Tests\Support\ProvisionContainerFactory;
 use SuperKernel\Contract\AnnotationCollectorInterface;
 use SuperKernel\Contract\ReflectorInterface;
 use SuperKernel\Reflector\Reflector;
@@ -218,8 +218,7 @@ final class ProvisionCollectorTest extends TestCase
      */
     private function package(string $name, string $class): PackageAnnotations
     {
-        $reflector = new Reflector();
-        $record = new ClassAnnotationScanner($reflector)->collect($reflector->reflectClass($class));
+        $record = ProvisionContainerFactory::declaredAttributes($class);
 
         return new PackageAnnotations($name, null, $record['classes'], $record['methods'], $record['properties']);
     }
