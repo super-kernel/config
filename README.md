@@ -4,132 +4,134 @@
 
 # SuperKernel Config
 
-`super-kernel/config` provides typed configuration declarations, named items, default selection, lazy loading, and retained object identity. It does not parse files, environment variables, command-line arguments, or arrays: `super-kernel/environment` supplies raw external properties, applications construct objects compatible with component configuration contracts, and consuming components validate their domain values. An explicit contract can be a class or interface.
+`super-kernel/config` gives an application typed configuration: classes declare configuration objects with `#[Configuration]`, and code reads them by their class or interface, by default or by name, loaded when first used and kept afterwards. It also turns `#[Provision]` methods into container services.
 
-## Single configuration
+## Installation
 
-`SuperKernel\Contract\SingleConfigInterface` marks a configuration object that is itself one item. Component configuration interfaces may extend it. Single sources may omit this marker.
+```bash
+composer require super-kernel/config
+```
+
+The package installs `super-kernel/di`, whose container creates the configuration sources, and needs the metadata of `skernel build`, which collects the declarations.
+
+## What it provides
+
+- Configuration sources declared with `#[Configuration]`: a single object, or a source whose methods provide named items with a default.
+- `ConfigInterface::get()` and `has()` to read an item by its class or interface and an optional name.
+- Items created on first use and the same object returned afterwards, also under the default name.
+- Checks of every declaration before anything is loaded, and detection of circular configuration dependencies.
+- Container services created by `#[Provision]` methods, under their return type or the given names.
+
+It does not:
+
+- read files, environment variables, command-line arguments, or arrays; `super-kernel/environment` reads raw properties, and your sources build the objects;
+- check the values a component needs, such as a port range; the component checks them;
+- copy items into snapshots: you receive the objects your sources return.
+
+## Quick start
+
+Declare a configuration interface. Save it as `src/Mail/MailConfig.php`:
 
 ```php
-use SuperKernel\Attribute\Configuration;
+<?php
+
+declare(strict_types=1);
+
+namespace Src\Mail;
+
 use SuperKernel\Contract\SingleConfigInterface;
 
-interface FeatureConfigInterface extends SingleConfigInterface
+interface MailConfig extends SingleConfigInterface
 {
-    public function value(): string;
-}
+    public function host(): string;
 
-#[Configuration(FeatureConfigInterface::class)]
-final readonly class FeatureConfig implements FeatureConfigInterface
-{
-    public function value(): string
-    {
-        return 'primary';
-    }
+    public function port(): int;
 }
 ```
 
-A single source is automatically the default and is available through both `get(FeatureConfigInterface::class)` and `get(FeatureConfigInterface::class, 'default')`. Both return the original source object.
-
-When `Configuration` omits its interface argument, Config infers the one most-specific implemented interface, ignoring the single-mode marker and inherited parent interfaces. Ambiguity raises `InvalidConfigurationException`. A contract may have only one `Configuration` source.
-
-## Multiple configuration items
-
-Choose this source form instead of the single source for the same contract. Implement `SuperKernel\Contract\MultipleConfigInterface` and explicitly identify the item class or interface on `Configuration`. Mark each item method with `SuperKernel\Attribute\Configuration`. The method name is its case-sensitive lookup key. The same Attribute marks the source class and its methods; on methods, omit `className` to use the source's item contract, or repeat that exact class or interface explicitly. Methods do not declare independent configuration sources.
+Declare the application's source for it. Save it as `src/Mail/AppMailConfig.php`:
 
 ```php
+<?php
+
+declare(strict_types=1);
+
+namespace Src\Mail;
+
 use SuperKernel\Attribute\Configuration;
-use SuperKernel\Contract\MultipleConfigInterface;
 
-// FeatureSettings is an application-owned implementation of FeatureConfigInterface.
-#[Configuration(FeatureConfigInterface::class)]
-final readonly class FeatureConfigurations implements MultipleConfigInterface
+#[Configuration(MailConfig::class)]
+final readonly class AppMailConfig implements MailConfig
 {
-    #[Configuration(default: true)]
-    public function primary(): FeatureConfigInterface
+    public function host(): string
     {
-        return new FeatureSettings('primary');
+        return 'smtp.example.com';
     }
 
-    #[Configuration]
-    public function cache(): FeatureConfigInterface
+    public function port(): int
     {
-        return new FeatureSettings('cache');
+        return 587;
     }
 }
 ```
 
-Items must be instances of the declared class or interface and do not need their own `Configuration` marker. Item methods must be public, non-static, parameterless, and declare a non-nullable class or interface return type compatible with the item contract. Unmarked methods are not configuration items. An empty group, incompatible signature, repeated item Attribute, both source-mode markers, or multiple explicit defaults fails declaration validation before loading.
-
-A group containing one item automatically uses that item as its default; no `default: true` is needed. With several items, `default: true` selects the default. If none is marked, named lookups remain usable; only an unnamed lookup throws `ConfigurationNotFoundException`. Defaults are never chosen by method ordering.
+Read it. Save the script as `bin/config.php`:
 
 ```php
-$primary = $config->get(FeatureConfigInterface::class);
-$same = $config->get(FeatureConfigInterface::class, 'primary');
-$cache = $config->get(FeatureConfigInterface::class, 'cache');
+<?php
+
+declare(strict_types=1);
+
+use Src\Mail\MailConfig;
+use SuperKernel\Context\ApplicationContext;
+use SuperKernel\Contract\ConfigInterface;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+$config = ApplicationContext::getContainer()->get(ConfigInterface::class);
+$mail = $config->get(MailConfig::class);
+
+echo $mail->host(), ':', $mail->port(), PHP_EOL;
+var_dump($mail === $config->get(MailConfig::class, 'default'));
 ```
 
-## Concrete option classes
+Build the project and run the script:
 
-A final readonly class with public properties can be an explicit item contract. It does not need a marker interface or a DI provider. Declare an application source with `#[Configuration(OptionClass::class)]`, implement `MultipleConfigInterface`, and return the option from one or more attributed methods. The same naming, default, lazy creation, type validation, and identity-retention rules apply to class and interface contracts.
-
-Config resolves the application source through the container and invokes the selected item method itself. It never requests those method-returned options from DI. A typed component loader can validate an option returned by `get(OptionClass::class, $name)` while retaining that exact instance. Single sources may also explicitly name a compatible class contract. Inference without a `Configuration` argument continues to select an implemented interface.
-
-## Registry lifecycle
-
-The container supplies `SuperKernel\Contract\ConfigInterface`. Creating it validates every `Configuration` declaration without resolving sources or invoking item methods.
-
-`has(string $interface, ?string $name = null): bool` never loads anything. With a name it checks that exact item. Without a name it checks whether the contract has a source declaration, even if a group has no default selected.
-
-`get(string $interface, ?string $name = null): ?object` resolves the exact concrete source class through the container, verifies source identity, and retains it. For a group it invokes only the requested method and retains the returned item once. A later lookup by the same name or its default alias returns the same item object. The result is an instance of the requested class or interface; Config never copies it into a snapshot.
-
-Unknown contracts or explicit names return `null` without consulting the container. A declared group with several items but no default throws on an unnamed lookup before loading its source. A failed source or method can be retried; a successful source remains retained when one of its methods fails.
-
-Config exceptions implement `ConfigExceptionInterface` and propagate unchanged. Foreign loading failures become `ConfigurationLoadingException` with their original cause. Recursive source or item loading raises `CircularConfigurationDependencyException` with the active contract/item path. Concurrent access to the same unresolved item is subject to the same re-entry check.
-
-## Provision factory methods
-
-A `#[Provision]` method registers a factory for a container service. Its class needs no `Configuration` declaration, and both the class constructor and the method can receive injected dependencies:
-
-```php
-use SuperKernel\Attribute\Provision;
-
-final readonly class ApplicationServices
-{
-    public function __construct(private ClockSettings $settings)
-    {
-    }
-
-    #[Provision]
-    public function clock(): ClockInterface
-    {
-        return new SystemClock($this->settings->timezone());
-    }
-
-    #[Provision('primary-clock', 'secondary-clock')]
-    public function namedClock(): ClockInterface
-    {
-        return new SystemClock($this->settings->timezone());
-    }
-}
+```bash
+skernel build
+php bin/config.php
 ```
 
-With no names, the service identifier is the declared non-nullable class or interface return type. Explicit names register exactly those identifiers instead of the return type. Nullable, scalar, union, intersection, and undeclared return types require explicit names. Repeated names on the same method are idempotent; different methods claiming one identifier fail with `InvalidConfigurationException`. A provision cannot replace its own source class because resolving that source would recursively request the same factory product.
+It prints:
 
-Sources must be instantiable classes. Provision methods must be public, non-static, and must not be constructors or destructors. Declarations are validated before source construction.
+```text
+smtp.example.com:587
+bool(true)
+```
 
-Existing `Provider` and class-level `FactoryProvider` mappings take priority over provisions; provisions take priority over ordinary class construction. The container retains the factory object and each successfully resolved identifier. Multiple names have independent retained products, matching class-level factory-provider behavior. Repeated reads of the same identifier return its retained value, including `null` for a non-class identifier. Direct calls through `ResolverFactoryInterface` leave the top-level product caller-owned while sharing its nested dependencies.
+## Public surface
 
-Method parameter defaults, nullable fallbacks, ambiguity, and reference rejection follow DI's method injection rules. PHP enforces declared return types, and the container verifies results requested by class or interface ID. PSR container exceptions propagate unchanged; other invocation failures become `ConfigurationLoadingException` with the original cause. Failed products are retried without discarding a successfully constructed factory. Dependency cycles are invalid and are not detected.
+| Name | Kind | Purpose |
+| --- | --- | --- |
+| `SuperKernel\Attribute\Configuration` | Attribute | Declares a configuration source on a class, or a named item on a method. |
+| `SuperKernel\Contract\SingleConfigInterface` | Interface | Marks a configuration object that is itself the default item. |
+| `SuperKernel\Contract\MultipleConfigInterface` | Interface | Marks a source whose `#[Configuration]` methods provide named items. |
+| `SuperKernel\Contract\ConfigInterface` | Interface | `get()` loads an item, `has()` checks a declaration without loading. |
+| `SuperKernel\Attribute\Provision` | Attribute | Declares a method that creates a container service. |
+| `SuperKernel\Config\Collector\ProvisionCollector` | Class | Lists the `#[Provision]` methods and their return types without calling them. |
 
-`SuperKernel\Config\Collector\ProvisionCollector` exposes the collected `#[Provision]` declarations without constructing sources or invoking methods. `getMethods()` returns an array keyed by declaring class and exact method name. Each entry contains `attribute`, the original `Provision` instance, and `returnType`, the native `ReflectionType` or `null` when undeclared. Named, nullable, union, and intersection types keep their native reflection form; `self`, `parent`, and `static` remain contextual names. An unavailable class or method raises `ReflectionException` when the collector is created.
+## Behavior to know
 
-## Domain validation and DI
+- Every declaration is checked when `ConfigInterface` is first created. An invalid one raises `SuperKernel\Config\Exception\InvalidConfigurationException`, such as `Configuration contract Src\Mail\MailConfig is declared by both Src\Mail\AppMailConfig and Src\Mail\OtherMailConfig.`, and `ConfigInterface` cannot be created.
+- `get()` returns `null` for an undeclared class, interface, or name. For a source with several items and no default, `get()` without a name raises `SuperKernel\Config\Exception\ConfigurationNotFoundException`; named lookups still work.
+- A source that needs, directly or indirectly, an item it is itself providing raises `SuperKernel\Config\Exception\CircularConfigurationDependencyException`, such as `Circular configuration dependency detected: Src\A -> Src\B -> Src\A.`
+- Two `#[Provision]` methods for one service name make the container unable to resolve any entry it has not created yet.
+- All exceptions of the package are PSR-11 container exceptions. Run `skernel build` again after adding or changing a declaration, or start with `skernel run`, which builds first.
 
-Bind a component's default configuration interface through a validating `FactoryProvider`. Its implementation loads the default from Config, validates domain values, and returns that same object. A component that supports named items may share a typed configuration loader between its default provider and connection factories. This adapter delegates discovery, names, defaults, and retention to Config and validates each selected item.
+## Documentation
 
-Ordinary consumers receive the validated configuration interface or named-item service through typed injection. Config resolves the declared concrete source class, so an interface provider does not recursively request itself. Sources and item methods may depend on other configurations; dependency cycles remain invalid.
+The developer documentation describes sources, named items, defaults, loading, validation in components, provisions, and the errors with complete examples and what not to do: [SuperKernel Config](https://github.com/super-kernel/.github/blob/main/docs/components/config.md).
 
-Keep configuration getters stable during runtime. The container retains successfully validated default interfaces; failed validation must not publish an interface entry. Config can already retain the raw item after domain validation fails, so later attempts must validate it again.
+## License
 
-`Configuration` declares application configuration. A higher-priority DI `Provider` override bypasses the replaced validator. Optional activation uses `has()` for declaration presence and then requests the validated interface. A missing declaration skips activation; a declared invalid source or missing default fails explicitly.
+Released under the MIT License. See [LICENSE](LICENSE).
